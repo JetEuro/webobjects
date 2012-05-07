@@ -8,5 +8,27 @@
     <artifactId>webobjects-core</artifactId>
     <version>1.0</version>
 
-    
+    <repositories>
+        <repository>
+            <id>laughing-panda</id>
+            <name>Laughing Panda</name>
+            <url>http://maven.laughingpanda.org/maven2/</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.jdave</groupId>
+            <artifactId>jdave-junit4</artifactId>
+            <version>1.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.4</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
 </project>
