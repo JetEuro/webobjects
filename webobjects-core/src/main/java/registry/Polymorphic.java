@@ -6,5 +6,4 @@ package registry;
  * Time: 7:03 PM
  */
 public interface Polymorphic {
-    String getType();
 }

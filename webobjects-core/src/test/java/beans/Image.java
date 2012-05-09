@@ -1,6 +1,6 @@
 package beans;
 
-import registry.GetRegistry;
+import registry.RegistryGettable;
 import registry.RegistryBean;
 
 /**
@@ -8,7 +8,7 @@ import registry.RegistryBean;
 * Date: 5/8/12
 * Time: 1:58 AM
 */
-public interface Image extends RegistryBean, GetRegistry {
+public interface Image extends RegistryBean, RegistryGettable {
     String getSrc();
 
     Image setSrc(String value);

@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Time: 8:39 PM
  */
 public abstract class IdGenerator {
-    enum Type {
+    public enum Type {
         SEQUENTIAL, SECURE_RANDOM, RANDOM
     }
 

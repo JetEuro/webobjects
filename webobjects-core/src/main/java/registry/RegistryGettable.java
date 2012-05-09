@@ -5,6 +5,6 @@ package registry;
  * Date: 5/7/12
  * Time: 6:08 PM
  */
-public interface GetRegistry {
+public interface RegistryGettable {
     Registry getRegistry();
 }

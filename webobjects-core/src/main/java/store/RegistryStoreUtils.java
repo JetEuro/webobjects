@@ -1,6 +1,6 @@
 package store;
 
-import registry.GetRegistry;
+import registry.RegistryGettable;
 import registry.Registries;
 import registry.Registry;
 import registry.RegistryBean;
@@ -20,10 +20,10 @@ public class RegistryStoreUtils {
 
     public static <T extends RegistryBean>
     void write(RegistryStore store, long id, T bean) {
-        if (!(bean instanceof GetRegistry)) {
+        if (!(bean instanceof RegistryGettable)) {
             throw new UnsupportedOperationException("write supported only for beans implementing GetRegistry");
         }
-        Registry registry = ((GetRegistry) bean).getRegistry();
+        Registry registry = ((RegistryGettable) bean).getRegistry();
         store.store(id, registry);
     }
 

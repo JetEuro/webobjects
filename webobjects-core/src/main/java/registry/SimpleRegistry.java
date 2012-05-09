@@ -3,6 +3,7 @@ package registry;
 import java.lang.annotation.AnnotationTypeMismatchException;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * User: cap_protect
@@ -10,9 +11,11 @@ import java.util.*;
  * Time: 11:14 PM
  */
 class SimpleRegistry implements Registry {
+    public static final String CLASS_PROPERTY = "class";
     private Map<String, SimpleRegistry> subRegistries = new TreeMap<String, SimpleRegistry>();
     private ArrayList<SimpleRegistry> indexedSubRegistries = new ArrayList<SimpleRegistry>();
     private TreeMap<String, Object> store = new TreeMap<String, Object>();
+    private static final Pattern INDEX_PATTERN = Pattern.compile("\\d+");
 
     public Set<String> getSubkeys() {
         return subRegistries.keySet();
@@ -23,6 +26,9 @@ class SimpleRegistry implements Registry {
     }
 
     public SimpleRegistry byName(String name) {
+        if (INDEX_PATTERN.matcher(name).matches()) {
+            return atIndex(Integer.parseInt(name));
+        }
         SimpleRegistry sr = subRegistries.get(name);
         if (sr == null) {
             sr = new SimpleRegistry();
@@ -63,7 +69,23 @@ class SimpleRegistry implements Registry {
     }
 
     public <T extends RegistryBean> T bean(Class<T> clazz) {
-        Class[]classArray = new Class[] { clazz };
+        Object classStringObj = get(CLASS_PROPERTY);
+        if (classStringObj != null
+                && classStringObj instanceof String) {
+            String classString = (String) classStringObj;
+            try {
+                Class someClass = Class.forName(classString);
+                if (clazz.isAssignableFrom(someClass)) {
+                    clazz = someClass;
+                }
+            } catch (ClassNotFoundException e) {
+                // skip
+            }
+        }
+        if (classStringObj == null && Polymorphic.class.isAssignableFrom(clazz)) {
+            put(CLASS_PROPERTY, clazz.getName());
+        }
+        Class[]classArray = new Class[] { clazz, RegistryGettable.class, JavaDefaults.class };
         return (T) Proxy.newProxyInstance(ClassLoader.getSystemClassLoader(),
                 classArray, new BeanInvocationHandler(clazz));
     }
@@ -151,12 +173,15 @@ class SimpleRegistry implements Registry {
                 irl = null;
             }
 
-            acceptsGetRegistry = GetRegistry.class.isAssignableFrom(beanClass);
+            acceptsGetRegistry = RegistryGettable.class.isAssignableFrom(beanClass);
         }
 
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+            // TODO equals, hashcode
             if (isGetRegistry(method)) {
                 return SimpleRegistry.this;
+            } else if (isToString(method)) {
+                return SimpleRegistry.this.toString();
             } else if (isIndexedListMethod(method)) {
                 return invokeIndexedListMethod(method, args);
             } else if (isGetProperty(method)) {
@@ -168,9 +193,13 @@ class SimpleRegistry implements Registry {
             throw new UnsupportedOperationException();
         }
 
+        private boolean isToString(Method method) {
+            return method.getName().equals("toString")
+                    && method.getParameterTypes().length == 0;
+        }
+
         private boolean isGetRegistry(Method method) {
-            return acceptsGetRegistry
-                    && method.getName().equals("getRegistry")
+            return method.getName().equals("getRegistry")
                     && method.getParameterTypes().length == 0
                     && Registry.class.isAssignableFrom(method.getReturnType());
         }
@@ -426,5 +455,15 @@ class SimpleRegistry implements Registry {
     @Override
     public String toString() {
         return Registries.stringify(this).toString();
+    }
+
+    private interface JavaDefaults {
+        int hashCode();
+
+        boolean equals(Object obj);
+
+        Object clone() throws CloneNotSupportedException;
+
+        String toString();
     }
 }

@@ -55,7 +55,7 @@ public class RegistryTest extends Specification<Registry> {
                 specify(image.getTitle(), must.equal("title"));
             }
 
-            System.out.println(registry);
+            System.out.println(userBean);
         }
 
         public void readTree() {

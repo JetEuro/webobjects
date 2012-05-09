@@ -15,6 +15,12 @@ public class Registries {
         return new SimpleRegistry();
     }
 
+    public static Registry newRegistry(Map<String,Object> liniarizedData) {
+        Registry registry = newRegistry();
+        putMassivly(registry, liniarizedData);
+        return registry;
+    }
+
     public static <T extends RegistryBean> T newBean(Class<T> clazz) {
         return new SimpleRegistry().bean(clazz);
     }
@@ -85,13 +91,13 @@ public class Registries {
         return pathString.isEmpty() ? name : pathString + "." + name;
     }
 
-    public static void putMassivly(Registry registry, Map<String, Object> values) {
-        for (String path : values.keySet()) {
+    public static void putMassivly(Registry registry, Map<String, Object> liniarizedData) {
+        for (String path : liniarizedData.keySet()) {
             String []arr = path.split("\\.");
             Registry reg = registry;
             for (int i = 0; i < arr.length; i++) {
                 if (i == arr.length - 1) {
-                    reg.put(arr[i], values.get(path));
+                    reg.put(arr[i], liniarizedData.get(path));
                 } else {
                     reg = reg.byName(arr[i]);
                 }
