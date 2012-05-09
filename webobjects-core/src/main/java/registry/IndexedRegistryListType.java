@@ -9,6 +9,6 @@ import java.lang.annotation.RetentionPolicy;
  * Time: 8:14 AM
  */
 @Retention(RetentionPolicy.RUNTIME)
-public @interface RegistryListType {
+public @interface IndexedRegistryListType {
     Class value();
 }

@@ -10,7 +10,7 @@ import java.util.SortedMap;
  * Time: 4:27 PM
  */
 public interface Registry extends SortedMap<String, Object> {
-    Set<String> getSubkeys();
+    Set<String> getNamedSubregistriesKeys();
 
     int getIndexedSubregistriesCount();
 
@@ -18,9 +18,17 @@ public interface Registry extends SortedMap<String, Object> {
 
     Registry atIndex(int index);
 
-    void removeSubRegistry(String name);
+    void removeSubregistry(String name);
 
-    void removeSubRegistry(int index);
+    void removeSubregistry(int index);
+
+    void clearAll();
+
+    void clearIndexedSubregistries();
+
+    void clearNamedSubregistries();
+
+    void clearSubregistires();
 
     <T extends RegistryBean> T bean(Class<T> clazz);
 }

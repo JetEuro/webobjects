@@ -1,7 +1,5 @@
 package registry;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -49,7 +47,7 @@ public class Registries {
     private static void iterate0(Registry node,
                                  String pathString,
                                  Map<String, Registry> result) {
-        for (String name : node.getSubkeys()) {
+        for (String name : node.getNamedSubregistriesKeys()) {
             Registry value = node.byName(name);
             String newPath = pathToName(pathString, name);
             result.put(newPath, value);
@@ -69,7 +67,7 @@ public class Registries {
     private static void liniarize0(Registry node,
                                  String pathString,
                                  Map<String, Object> result) {
-        for (String name : node.getSubkeys()) {
+        for (String name : node.getNamedSubregistriesKeys()) {
             String newPath = pathToName(pathString, name);
             Registry value = node.byName(name);
             liniarize0(value, newPath, result);

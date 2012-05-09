@@ -25,7 +25,14 @@ class InMemoryStore implements RegistryStore {
     }
 
     public void store(long id, Registry registry) {
-        backendMap.put(id, Registries.liniarize(registry));
+        Map<String, Object> liniarizedData = Registries.liniarize(registry);
+
+        Map<String, Object> data = backendMap.get(id);
+        if (data == null) {
+            backendMap.put(id, liniarizedData);
+        } else {
+            data.putAll(liniarizedData);
+        }
     }
 
     public boolean load(long id, Registry registry) {

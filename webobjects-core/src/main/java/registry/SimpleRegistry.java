@@ -13,16 +13,16 @@ import java.util.regex.Pattern;
 class SimpleRegistry implements Registry {
     public static final String CLASS_PROPERTY = "class";
     private Map<String, SimpleRegistry> subRegistries = new TreeMap<String, SimpleRegistry>();
-    private ArrayList<SimpleRegistry> indexedSubRegistries = new ArrayList<SimpleRegistry>();
+    private ArrayList<SimpleRegistry> indexedSubregistries = new ArrayList<SimpleRegistry>();
     private TreeMap<String, Object> store = new TreeMap<String, Object>();
     private static final Pattern INDEX_PATTERN = Pattern.compile("\\d+");
 
-    public Set<String> getSubkeys() {
+    public Set<String> getNamedSubregistriesKeys() {
         return subRegistries.keySet();
     }
 
     public int getIndexedSubregistriesCount() {
-        return indexedSubRegistries.size();
+        return indexedSubregistries.size();
     }
 
     public SimpleRegistry byName(String name) {
@@ -38,34 +38,52 @@ class SimpleRegistry implements Registry {
     }
 
     public SimpleRegistry atIndex(int index) {
-        if (index + 1 > indexedSubRegistries.size()) {
-            indexedSubRegistries.addAll(
+        if (index + 1 > indexedSubregistries.size()) {
+            indexedSubregistries.addAll(
                     Collections.<SimpleRegistry>nCopies(index + 1
-                            - indexedSubRegistries.size(), null)
+                            - indexedSubregistries.size(), null)
             );
         }
 
-        SimpleRegistry sr = indexedSubRegistries.get(index);
+        SimpleRegistry sr = indexedSubregistries.get(index);
         if (sr == null) {
             sr = new SimpleRegistry();
-            indexedSubRegistries.set(index, sr);
+            indexedSubregistries.set(index, sr);
         }
         return sr;
     }
 
-    public void removeSubRegistry(String name) {
+    public void removeSubregistry(String name) {
         subRegistries.remove(name);
     }
 
-    public void removeSubRegistry(int index) {
-        indexedSubRegistries.remove(index);
-        int idx = indexedSubRegistries.size() - 1;
-        while (idx >= 0 && indexedSubRegistries.get(idx) == null) {
+    public void removeSubregistry(int index) {
+        indexedSubregistries.remove(index);
+        int idx = indexedSubregistries.size() - 1;
+        while (idx >= 0 && indexedSubregistries.get(idx) == null) {
             idx--;
         }
-        if (idx > 0 && idx < indexedSubRegistries.size()) {
-            indexedSubRegistries.subList(idx, indexedSubRegistries.size()).clear();
+        if (idx > 0 && idx < indexedSubregistries.size()) {
+            indexedSubregistries.subList(idx, indexedSubregistries.size()).clear();
         }
+    }
+
+    public void clearAll() {
+        clearSubregistires();
+        clear();
+    }
+
+    public void clearSubregistires() {
+        clearIndexedSubregistries();
+        clearNamedSubregistries();
+    }
+
+    public void clearIndexedSubregistries() {
+        indexedSubregistries.clear();
+    }
+
+    public void clearNamedSubregistries() {
+        subRegistries.clear();
     }
 
     public <T extends RegistryBean> T bean(Class<T> clazz) {
@@ -82,7 +100,7 @@ class SimpleRegistry implements Registry {
                 // skip
             }
         }
-        if (classStringObj == null && Polymorphic.class.isAssignableFrom(clazz)) {
+        if (Polymorphic.class.isAssignableFrom(clazz)) {
             put(CLASS_PROPERTY, clazz.getName());
         }
         Class[]classArray = new Class[] { clazz, RegistryGettable.class, JavaDefaults.class };
@@ -131,9 +149,9 @@ class SimpleRegistry implements Registry {
 
         private final class IndexedRegistryiesList extends AbstractList<Object> {
             private final Method getMethod;
-            private final RegistryListType listType;
+            private final IndexedRegistryListType listType;
 
-            public IndexedRegistryiesList(Method getMethod, RegistryListType listType) {
+            public IndexedRegistryiesList(Method getMethod, IndexedRegistryListType listType) {
                 this.getMethod = getMethod;
                 this.listType = listType;
             }
@@ -158,7 +176,7 @@ class SimpleRegistry implements Registry {
         public BeanInvocationHandler(Class<?> beanClass) {
             this.beanClass = beanClass;
             if (List.class.isAssignableFrom(beanClass)
-                    && beanClass.isAnnotationPresent(RegistryListType.class)) {
+                    && beanClass.isAnnotationPresent(IndexedRegistryListType.class)) {
 
                 final Method getMethod;
                 try {
@@ -167,7 +185,7 @@ class SimpleRegistry implements Registry {
                     throw new RuntimeException("could not get 'get' List method");
                 }
 
-                final RegistryListType listType = beanClass.getAnnotation(RegistryListType.class);
+                final IndexedRegistryListType listType = beanClass.getAnnotation(IndexedRegistryListType.class);
                 irl = new IndexedRegistryiesList(getMethod, listType);
             } else {
                 irl = null;
@@ -182,6 +200,8 @@ class SimpleRegistry implements Registry {
                 return SimpleRegistry.this;
             } else if (isToString(method)) {
                 return SimpleRegistry.this.toString();
+            } else if (isRegistryMapType(method)) {
+                return getMapObject(method);
             } else if (isIndexedListMethod(method)) {
                 return invokeIndexedListMethod(method, args);
             } else if (isGetProperty(method)) {
@@ -191,6 +211,21 @@ class SimpleRegistry implements Registry {
                 return proxy;
             }
             throw new UnsupportedOperationException();
+        }
+
+        private Map getMapObject(Method method) {
+            final RegistryMapType mapType = method.getAnnotation(RegistryMapType.class);
+
+            final BasicTypeParser caster = BasicTypeParser.create(mapType.value());
+
+            String propertyName = getPropertyName(method);
+            final SimpleRegistry registry = byName(propertyName);
+
+            return new StringCasterMap(registry, caster);
+        }
+
+        private boolean isRegistryMapType(Method method) {
+            return method.isAnnotationPresent(RegistryMapType.class);
         }
 
         private boolean isToString(Method method) {
@@ -237,9 +272,7 @@ class SimpleRegistry implements Registry {
         }
 
         private Object getProperty(Method method) {
-            String name = method.getName().substring("get".length());
-            name = name.substring(0, 1).toLowerCase() + name.substring(1);
-
+            String name = getPropertyName(method);
 
             Class<?> retType = method.getReturnType();
             if (RegistryBean.class.isAssignableFrom(retType)) {
@@ -247,6 +280,12 @@ class SimpleRegistry implements Registry {
             }
 
             return store.get(name);
+        }
+
+        private String getPropertyName(Method method) {
+            String name = method.getName().substring("get".length());
+            name = name.substring(0, 1).toLowerCase() + name.substring(1);
+            return name;
         }
 
         private void setProperty(Method method, Object value) {
@@ -265,11 +304,11 @@ class SimpleRegistry implements Registry {
 
         }
 
-        private Object beanize(Method method, RegistryListType listType, SimpleRegistry reg) {
+        private Object beanize(Method method, IndexedRegistryListType listType, SimpleRegistry reg) {
             if (listType == null) {
                 throw new AnnotationTypeMismatchException(
                         method,
-                        "declare " + RegistryListType.class + " for " +
+                        "declare " + IndexedRegistryListType.class + " for " +
                         "for bean types that implements " + List.class);
             }
 
@@ -283,14 +322,15 @@ class SimpleRegistry implements Registry {
                 int idx;
                 try {
                     idx = Integer.parseInt(name);
-                    if (0 <= idx && idx < indexedSubRegistries.size()) {
-                        reg = indexedSubRegistries.get(idx);
+                    if (0 <= idx && idx < indexedSubregistries.size()) {
+                        reg = indexedSubregistries.get(idx);
                     }
                 } catch (NumberFormatException nfe){
                 }
             }
             return reg;
         }
+
     }
 
     public void clear() {
@@ -465,5 +505,92 @@ class SimpleRegistry implements Registry {
         Object clone() throws CloneNotSupportedException;
 
         String toString();
+    }
+
+    private static class StringCasterMap extends AbstractMap {
+        final AbstractSet<Entry> set;
+        private final SimpleRegistry registry;
+        private final BasicTypeParser caster;
+
+        public StringCasterMap(SimpleRegistry registry, BasicTypeParser caster) {
+            this.registry = registry;
+            this.caster = caster;
+            set = new StringCasterEntrySet(registry, caster);
+        }
+
+        @Override
+        public Set entrySet() {
+            return set;
+        }
+
+        @Override
+        public Object put(Object key, Object value) {
+            String keyStr = caster.toString(key);
+            return registry.put(keyStr, value);
+        }
+
+        private class StringCasterEntrySet extends AbstractSet<Entry> {
+            private final SimpleRegistry registry;
+            private final BasicTypeParser caster;
+
+            public StringCasterEntrySet(SimpleRegistry registry, BasicTypeParser caster) {
+                this.registry = registry;
+                this.caster = caster;
+            }
+
+            @Override
+            public Iterator<Entry> iterator() {
+                final Iterator<Entry<String, Object>> it = registry.entrySet().iterator();
+
+                return new StringCasterEntrySetIterator(it);
+            }
+
+            @Override
+            public int size() {
+                return registry.size();
+            }
+
+
+            private class StringCasterEntrySetIterator implements Iterator<Entry> {
+                private final Iterator<Entry<String, Object>> it;
+
+                public StringCasterEntrySetIterator(Iterator<Entry<String, Object>> it) {
+                    this.it = it;
+                }
+
+                public boolean hasNext() {
+                    return it.hasNext();
+                }
+
+                public Entry next() {
+                    final Entry<String, Object> someEntry = it.next();
+                    return new StringCasterEntry(someEntry);
+                }
+
+                public void remove() {
+                }
+
+                private class StringCasterEntry implements Entry {
+                    private final Entry<String, Object> someEntry;
+
+                    public StringCasterEntry(Entry<String, Object> someEntry) {
+                        this.someEntry = someEntry;
+                    }
+
+                    public Object getKey() {
+                        return caster.parse(someEntry.getKey());
+
+                    }
+
+                    public Object getValue() {
+                        return someEntry.getValue();
+                    }
+
+                    public Object setValue(Object value) {
+                        return someEntry.setValue(value);
+                    }
+                }
+            }
+        }
     }
 }
