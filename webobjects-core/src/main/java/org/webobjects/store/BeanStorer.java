@@ -4,7 +4,7 @@ import org.webobjects.registry.Registry;
 import org.webobjects.registry.RegistryBean;
 
 /**
- * User: TCSDEVELOPER
+ * User: cap_protect
  * Date: 5/9/12
  * Time: 6:13 PM
  */
@@ -26,4 +26,6 @@ public interface BeanStorer {
     <T extends RegistryBean> T getBean(Class<T> clazz);
 
     BeanStorer subStorer(String ...path);
+
+    void addRemovedKey(String key);
 }

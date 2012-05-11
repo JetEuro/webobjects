@@ -1,19 +1,16 @@
-package org.webobjects.distributed;
+package org.webobjects.queue.distributed;
 
 import jdave.Specification;
 import jdave.junit4.JDaveRunner;
+import me.prettyprint.cassandra.service.CassandraHostConfigurator;
+import me.prettyprint.cassandra.service.ThriftCluster;
 import me.prettyprint.hector.api.Cluster;
-import me.prettyprint.hector.api.factory.HFactory;
 import org.junit.runner.RunWith;
-import org.webobjects.CassandraTestCase;
-import org.webobjects.InMemoryTestCase;
 import org.webobjects.WebObjectsTestCase;
+import org.webobjects.distributed.ClusterStateMonitor;
 import org.webobjects.store.RegistryStore;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -26,19 +23,21 @@ public class DistributedQueueTest extends Specification<DistributedQueue> {
     public static class LongConsumer implements Runnable {
         private List<Long> values = new ArrayList<Long>();
         private final DistributedQueue<Long> queue;
+        private ClusterStateMonitor monitor;
         private final AtomicInteger count;
         private Thread thread;
 
-        public LongConsumer(DistributedQueue<Long> queue, AtomicInteger count) {
+        public LongConsumer(DistributedQueue<Long> queue, ClusterStateMonitor monitor, AtomicInteger count) {
             this.queue = queue;
+            this.monitor = monitor;
             this.count = count;
         }
 
         public void run() {
-            System.out.println("consumer");
             try {
                 while (!Thread.currentThread().isInterrupted()) {
-                    values.add(queue.take());
+                    Long val = queue.take();
+                    values.add(val);
                     count.incrementAndGet();
                 }
             } catch (InterruptedException e) {
@@ -47,6 +46,7 @@ public class DistributedQueueTest extends Specification<DistributedQueue> {
         }
 
         public void start() {
+            monitor.start();
             thread = new Thread(this);
             thread.start();
         }
@@ -58,19 +58,21 @@ public class DistributedQueueTest extends Specification<DistributedQueue> {
             } catch (InterruptedException e) {
                 // return
             }
+            monitor.stop();
         }
     }
 
     public static class LongProducer implements Runnable {
-
         private final DistributedQueue<Long> queue;
         private long pos;
+        private final ClusterStateMonitor monitor;
         private final long start;
         private final long end;
         private Thread thread;
 
-        public LongProducer(DistributedQueue<Long> queue, long start, long end) {
+        public LongProducer(DistributedQueue<Long> queue, ClusterStateMonitor monitor, long start, long end) {
             this.queue = queue;
+            this.monitor = monitor;
             this.start = start;
             this.end = end;
             this.pos = start;
@@ -80,6 +82,7 @@ public class DistributedQueueTest extends Specification<DistributedQueue> {
             try {
                 while (!Thread.currentThread().isInterrupted() && pos < end) {
                     queue.put(pos++);
+                    Thread.sleep(100L);
                 }
             } catch (InterruptedException e) {
                 // quit
@@ -87,6 +90,7 @@ public class DistributedQueueTest extends Specification<DistributedQueue> {
         }
 
         public void start() {
+            monitor.start();
             thread = new Thread(this);
             thread.start();
         }
@@ -98,14 +102,15 @@ public class DistributedQueueTest extends Specification<DistributedQueue> {
             } catch (InterruptedException e) {
                 // return
             }
+            monitor.stop();
         }
     }
 
-    public abstract class OfferTakeElement {
+    public abstract class OfferTakeLong {
         public static final int PRODUCED_COUNT = 10;
         public static final int PRODUCERS = 10;
         public static final int CONSUMERS = 10;
-        public static final int TOTAL = PRODUCED_COUNT * PRODUCED_COUNT;
+        public static final int TOTAL = PRODUCED_COUNT * PRODUCERS;
 
         private WebObjectsTestCase testCase = getCase();
         protected abstract WebObjectsTestCase getCase();
@@ -119,17 +124,26 @@ public class DistributedQueueTest extends Specification<DistributedQueue> {
 
         public void offerTake() {
             AtomicInteger count = new AtomicInteger();
-            initConsumers(CONSUMERS, count);
-            initProducers(PRODUCERS);
+            createConsumers(CONSUMERS, count);
+            createProducers(PRODUCERS);
             testCase.init();
             startConsumers();
             startProducers();
 
-            int retries = 500;
+            System.out.println("GO!");
+
+            int retries = 600;
+            int percents = 10;
             while (count.get() < TOTAL && retries-- > 0) {
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException e) {
+                    break;
+                }
+                if (100 * count.get() / TOTAL >= percents)
+                {
+                    System.out.println(percents + "%");
+                    percents += 10;
                 }
             }
 
@@ -153,31 +167,8 @@ public class DistributedQueueTest extends Specification<DistributedQueue> {
             testCase.cleanup();
         }
 
-        private void startConsumers() {
-            for (LongConsumer consumer : consumers) {
-                ClusterStateMonitor monitor = consumer.queue.getMonitor();
-                monitor.start();
-                monitor.check();
-                consumer.start();
-            }
-        }
 
-        private void startProducers() {
-            for (LongProducer producer : producers) {
-                ClusterStateMonitor monitor = producer.queue.getMonitor();
-                monitor.start();
-                monitor.check();
-                producer.start();
-            }
-        }
-
-        private void endConsumers() {
-            for (LongConsumer consumer : consumers) {
-                consumer.stop();
-            }
-        }
-
-        private void initConsumers(int n, AtomicInteger count) {
+        private void createConsumers(int n, AtomicInteger count) {
             consumers = new LongConsumer[n];
             for (int i = 0; i < consumers.length; i++) {
                 ClusterStateMonitor monitor = testCase
@@ -192,11 +183,11 @@ public class DistributedQueueTest extends Specification<DistributedQueue> {
                         .setMonitor(monitor)
                         .setStore(store)
                         .create();
-                consumers[i] = new LongConsumer(queue, count);
+                consumers[i] = new LongConsumer(queue, monitor, count);
             }
         }
 
-        private void initProducers(int n) {
+        private void createProducers(int n) {
             producers = new LongProducer[n];
             for (int i = 0; i < producers.length; i++) {
                 ClusterStateMonitor monitor = testCase
@@ -213,10 +204,34 @@ public class DistributedQueueTest extends Specification<DistributedQueue> {
                         .create();
                 int start = i * PRODUCED_COUNT;
                 int end = (i + 1) * PRODUCED_COUNT;
-                producers[i] = new LongProducer(queue, start, end);
+                producers[i] = new LongProducer(queue, monitor, start, end);
             }
+        }
+
+        private void startConsumers() {
+            for (LongConsumer consumer : consumers) {
+                consumer.start();
+            }
+            try {
+                // establish cluster up
+                Thread.sleep(1000L);
+            } catch (InterruptedException e) {
+                return;
+            }
+            for (LongConsumer consumer : consumers) {
+                consumer.monitor.check();
+            }
+        }
+
+        private void startProducers() {
             for (LongProducer producer : producers) {
-                producer.queue.getMonitor().check();
+                producer.start();
+            }
+        }
+
+        private void endConsumers() {
+            for (LongConsumer consumer : consumers) {
+                consumer.stop();
             }
         }
 
@@ -227,23 +242,26 @@ public class DistributedQueueTest extends Specification<DistributedQueue> {
         }
     }
 
-    public class InMemoryOfferTakeElement extends OfferTakeElement {
-        @Override
-        protected WebObjectsTestCase getCase() {
-            return new InMemoryTestCase();
-        }
-    }
-
-    public class CassandraOfferTakeElement extends OfferTakeElement {
+    public class CassandraOfferTakeLong extends OfferTakeLong {
         private Cluster cluster;
 
         @Override
         protected WebObjectsTestCase getCase() {
-            if (cluster == null) {
-                cluster = HFactory.getOrCreateCluster("Test Cluster", "localhost");
-            }
-            return new CassandraTestCase(cluster);
+            return WebObjectsTestCase.cassandra(new WebObjectsTestCase.ClusterFactory() {
+                public Cluster getCluster() {
+                    ThriftCluster localhost = new ThriftCluster("Test Cluster",
+                            new CassandraHostConfigurator("localhost"), null);
+                    localhost.onStartup();
+                    return localhost;
+                }
+            });
         }
     }
 
+    public class InMemoryOfferTakeLong extends OfferTakeLong {
+        @Override
+        protected WebObjectsTestCase getCase() {
+            return WebObjectsTestCase.inMemory();
+        }
+    }
 }

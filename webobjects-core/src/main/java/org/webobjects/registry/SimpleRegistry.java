@@ -108,6 +108,28 @@ class SimpleRegistry implements Registry {
                 classArray, new BeanInvocationHandler(clazz));
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        SimpleRegistry that = (SimpleRegistry) o;
+
+        if (!indexedSubregistries.equals(that.indexedSubregistries)) return false;
+        if (!store.equals(that.store)) return false;
+        if (!subRegistries.equals(that.subRegistries)) return false;
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = subRegistries.hashCode();
+        result = 31 * result + indexedSubregistries.hashCode();
+        result = 31 * result + store.hashCode();
+        return result;
+    }
+
     private static final class IRLSignature {
         private final String name;
         private final Class []params;
@@ -200,6 +222,10 @@ class SimpleRegistry implements Registry {
                 return SimpleRegistry.this;
             } else if (isToString(method)) {
                 return SimpleRegistry.this.toString();
+            } else if (isEquals(method)) {
+                return equals(args[0]);
+            } else if (isHashCode(method)) {
+                return hashCode();
             } else if (isRegistryMapType(method)) {
                 return getMapObject(method);
             } else if (isIndexedListMethod(method)) {
@@ -233,6 +259,16 @@ class SimpleRegistry implements Registry {
         private boolean isToString(Method method) {
             return method.getName().equals("toString")
                     && method.getParameterTypes().length == 0;
+        }
+
+        private boolean isHashCode(Method method) {
+            return method.getName().equals("hashCode")
+                    && method.getParameterTypes().length == 0;
+        }
+
+        private boolean isEquals(Method method) {
+            return method.getName().equals("equals")
+                    && method.getParameterTypes().length == 1;
         }
 
         private boolean isGetRegistry(Method method) {
@@ -350,6 +386,19 @@ class SimpleRegistry implements Registry {
             return reg;
         }
 
+        @Override
+        public boolean equals(Object o) {
+            if (o instanceof RegistryGettable) {
+                RegistryGettable otherBean = (RegistryGettable) o;
+                return SimpleRegistry.this.equals(otherBean.getRegistry());
+            }
+            return false;
+        }
+
+        @Override
+        public int hashCode() {
+            return SimpleRegistry.this.hashCode();
+        }
     }
 
     public void clear() {
@@ -499,16 +548,6 @@ class SimpleRegistry implements Registry {
 
     public boolean isEmpty() {
         return store.isEmpty();
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        return store.equals(o);
-    }
-
-    @Override
-    public int hashCode() {
-        return store.hashCode();
     }
 
     @Override

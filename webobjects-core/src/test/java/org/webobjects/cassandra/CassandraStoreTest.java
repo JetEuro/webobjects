@@ -1,10 +1,9 @@
-package org.webobjects.casasndra;
+package org.webobjects.cassandra;
 
-import org.webobjects.CassandraTestCase;
+import org.webobjects.WebObjectsTestCase;
 import org.webobjects.beans.ImageTree;
 import org.webobjects.beans.ImageTreeNode;
 import org.webobjects.beans.User;
-import org.webobjects.cassandra.CassandraStore;
 import jdave.Specification;
 import jdave.junit4.JDaveRunner;
 import me.prettyprint.hector.api.Cluster;
@@ -25,10 +24,10 @@ public class CassandraStoreTest extends Specification<CassandraStore> {
     public class StoreAndLoadUserLocal {
         public static final int BEAN_ID = 0;
         private Cluster cluster = HFactory.getOrCreateCluster("Test Cluster", "localhost");
-        private CassandraTestCase testCase = new CassandraTestCase(cluster);
+        private WebObjectsTestCase testCase = WebObjectsTestCase.cassandra(cluster);
         private RegistryStore store = testCase.getFactory()
                 .store()
-                .setName(CassandraTestCase.TEST_COLUMN_FAMILY)
+                .setName(WebObjectsTestCase.CASSANDRA_TEST_COLUMN_FAMILY)
                 .create();
 
         public void init() {
