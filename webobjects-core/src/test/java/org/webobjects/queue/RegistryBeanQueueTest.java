@@ -14,7 +14,7 @@ import java.util.HashSet;
 import java.util.Queue;
 
 /**
- * User: TCSDEVELOPER
+ * User: cap_protect
  * Date: 5/11/12
  * Time: 1:01 PM
  */
@@ -47,6 +47,7 @@ public class RegistryBeanQueueTest extends Specification<RegistryBeanQueue> {
         private RegistryBeanQueue<QueueElement> queue = testCase
                 .getFactory()
                 .<QueueElement>registryBeanQueue()
+                .setStoreName(WebObjectsTestCase.CASSANDRA_TEST_COLUMN_FAMILY)
                 .create();
 
         public void takeOffer() {

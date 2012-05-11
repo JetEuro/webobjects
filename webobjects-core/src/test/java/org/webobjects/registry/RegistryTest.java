@@ -4,6 +4,9 @@ import org.webobjects.beans.*;
 import jdave.Specification;
 import jdave.junit4.JDaveRunner;
 import org.junit.runner.RunWith;
+import org.webobjects.beans.calculate.*;
+import org.webobjects.beans.calculate.delegates.CalculateDelegates;
+import org.webobjects.beans.delegates.RunRequestProcessDelegate;
 
 /**
  * User: cap_protect
@@ -83,5 +86,79 @@ public class RegistryTest extends Specification<Registry> {
 
             System.out.println(registry);
         }
+
+        public void executeTask() {
+            AddCommentRequest request = registry.bean(AddCommentRequest.class);
+            ExecutionContext execCtx = registry.getExecutionContext();
+            execCtx.bind("process", new RunRequestProcessDelegate());
+
+            User userBean = request.getUser();
+            request.setText("text");
+
+            ImageTree tree = userBean.getTree();
+            ImageTreeNode root = tree.getRoot();
+
+            userBean.getCredentials().setUsername("username");
+            root.get(0).getImage().setSrc("img0");
+            root.get(1).getImage().setSrc("img1");
+            root.get(2).getImage().setSrc("img2");
+            root.get(0).get(0).getImage().setSrc("img00");
+            root.get(0).get(1).getImage().setSrc("img01");
+            root.get(0).get(2).getImage().setSrc("img02");
+
+            specify(userBean.getTree().getRoot().size(), 3);
+            specify(userBean.getTree().getRoot().get(0).size(), 3);
+
+            specify(root.get(0).getImage().getSrc(), "img0");
+            specify(root.get(1).getImage().getSrc(), "img1");
+            specify(root.get(2).getImage().getSrc(), "img2");
+            specify(root.get(0).get(0).getImage().getSrc(), "img00");
+            specify(root.get(0).get(1).getImage().getSrc(), "img01");
+            specify(root.get(0).get(2).getImage().getSrc(), "img02");
+
+            StringBuilder response = new StringBuilder();
+            request.process(response);
+            specify(response.toString(), "username: text");
+        }
+
+        private CalculateTask calculateTask(Class<? extends CalculateTask> clazz, int a, int b) {
+            CalculateTask task = Registries.newBean(clazz);
+            CalculateDelegates.defaultContext(
+                    task.getRegistry().getExecutionContext());
+            task.setA(a);
+            task.setB(b);
+            return task;
+        }
+
+        public void addTask() {
+            CalculateTask task = calculateTask(AddTask.class, 5, 11);
+            execute(task);
+            specify(task.getC(), 16);
+        }
+
+
+        public void subtractTask() {
+            CalculateTask task = calculateTask(SubtractTask.class, 5, 11);
+            execute(task);
+            specify(task.getC(), -6);
+        }
+
+
+        public void multiplyTask() {
+            CalculateTask task = calculateTask(MultiplyTask.class, 5, 11);
+            execute(task);
+            specify(task.getC(), 55);
+        }
+
+
+        public void divideTask() {
+            CalculateTask task = calculateTask(DivideTask.class, 60, 5);
+            execute(task);
+            specify(task.getC(), 12);
+        }
+
+        private void execute(Task task) {
+            task.run();
+    }
     }
 }

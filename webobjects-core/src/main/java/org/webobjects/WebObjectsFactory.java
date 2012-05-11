@@ -393,7 +393,7 @@ public abstract class WebObjectsFactory {
             }
 
             if (idQueueName == null) {
-                idQueueName = storeName + "$ID_QUEUE";
+                idQueueName = storeName + "$IDQUEUE";
             }
 
             if (store == null) {

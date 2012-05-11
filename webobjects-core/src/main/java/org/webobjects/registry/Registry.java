@@ -30,4 +30,6 @@ public interface Registry extends SortedMap<String, Object> {
     void clearSubregistires();
 
     <T extends RegistryBean> T bean(Class<T> clazz);
+
+    ExecutionContext getExecutionContext();
 }

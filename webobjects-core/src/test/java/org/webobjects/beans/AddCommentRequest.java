@@ -1,5 +1,7 @@
 package org.webobjects.beans;
 
+import org.webobjects.registry.RegistryHandler;
+
 /**
 * User: cap_protect
 * Date: 5/8/12
@@ -11,4 +13,7 @@ public interface AddCommentRequest extends Request {
     String getText();
 
     void setText(String text);
+
+    @RegistryHandler("process")
+    void process(StringBuilder response);
 }

@@ -1,5 +1,7 @@
 package org.webobjects.registry;
 
+import org.webobjects.utils.BasicTypeParser;
+
 import java.lang.annotation.AnnotationTypeMismatchException;
 import java.lang.reflect.*;
 import java.util.*;
@@ -16,6 +18,7 @@ class SimpleRegistry implements Registry {
     private ArrayList<SimpleRegistry> indexedSubregistries = new ArrayList<SimpleRegistry>();
     private TreeMap<String, Object> store = new TreeMap<String, Object>();
     private static final Pattern INDEX_PATTERN = Pattern.compile("\\d+");
+    private volatile ExecutionContext executionContext = new ExecutionContext();
 
     public Set<String> getNamedSubregistriesKeys() {
         return subRegistries.keySet();
@@ -108,6 +111,14 @@ class SimpleRegistry implements Registry {
                 classArray, new BeanInvocationHandler(clazz));
     }
 
+    public ExecutionContext getExecutionContext() {
+        return executionContext;
+    }
+
+    public void setExecutionContext(ExecutionContext context) {
+        executionContext = context;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -161,6 +172,7 @@ class SimpleRegistry implements Registry {
     }
 
     private static Map<IRLSignature, Method> IRL_SIGNATURES = new HashMap();
+
     static {
         for (Method method : BeanInvocationHandler.IndexedRegistryiesList.class.getMethods()) {
             IRL_SIGNATURES.put(new IRLSignature(method.getName(), method.getParameterTypes()), method);
@@ -217,8 +229,9 @@ class SimpleRegistry implements Registry {
         }
 
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-            // TODO equals, hashcode
-            if (isGetRegistry(method)) {
+            if (isTaskImplementation(method)) {
+                return executeTask(proxy, method, args);
+            } else if (isGetRegistry(method)) {
                 return SimpleRegistry.this;
             } else if (isToString(method)) {
                 return SimpleRegistry.this.toString();
@@ -239,6 +252,33 @@ class SimpleRegistry implements Registry {
                 return proxy;
             }
             throw new UnsupportedOperationException();
+        }
+
+        private Object executeTask(Object proxy, Method method, Object[] args) {
+            RegistryHandler impl = method.getAnnotation(RegistryHandler.class);
+            RegistryDelegate delegate = getExecutionContext().selectDelegate(impl);
+            if (delegate == null) {
+                return null;
+            }
+            return delegate.execute((RegistryBean) proxy, args);
+        }
+
+        private Map<Class, RegistryDelegate> delegates = new HashMap();
+
+        private RegistryDelegate getTaskClass(Class<? extends RegistryDelegate> taskClass) throws IllegalAccessException, InstantiationException {
+            synchronized (delegates) {
+                RegistryDelegate delegate = delegates.get(taskClass);
+                if (delegate == null) {
+                    delegate = taskClass.newInstance();
+                    delegates.put(taskClass, delegate);
+                }
+                return delegate;
+            }
+
+        }
+
+        private boolean isTaskImplementation(Method method) {
+            return method.isAnnotationPresent(RegistryHandler.class);
         }
 
         private Map getMapObject(Method method) {

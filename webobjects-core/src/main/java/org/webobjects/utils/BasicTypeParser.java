@@ -1,4 +1,4 @@
-package org.webobjects.registry;
+package org.webobjects.utils;
 
 /**
  * User: cap_protect
