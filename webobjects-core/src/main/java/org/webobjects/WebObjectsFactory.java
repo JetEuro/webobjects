@@ -9,11 +9,15 @@ import org.webobjects.queue.RegistryBeanQueue;
 import org.webobjects.queue.StoredRegistryBeanQueue;
 import org.webobjects.queue.distributed.OrderTimeMapDistributedQueue;
 import org.webobjects.registry.RegistryBean;
+import org.webobjects.service.RegistryExecutor;
+import org.webobjects.service.RegistryQueueExecutor;
+import org.webobjects.service.RegistryTask;
 import org.webobjects.store.IdGenerator;
 import org.webobjects.store.InMemoryStore;
 import org.webobjects.store.RegistryStore;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -77,6 +81,33 @@ public abstract class WebObjectsFactory {
         <F extends T> RegistryBeanQueueFactoryObject<T> setBeanClass(Class<F> clazz);
     }
 
+    public interface RegistryExecutorFactoryObject
+            extends FactoryObject<RegistryExecutor> {
+        RegistryExecutorFactoryObject setMonitorStoreName(String name);
+
+        RegistryExecutorFactoryObject setMonitor(ClusterStateMonitor monitor);
+
+        RegistryExecutorFactoryObject setStoreName(String storeName);
+
+        RegistryExecutorFactoryObject setStore(RegistryStore store);
+
+        RegistryExecutorFactoryObject setIdQueueName(String idQueueName);
+
+        RegistryExecutorFactoryObject setIdQueue(DistributedQueue<Long> idQueue);
+
+        RegistryExecutorFactoryObject setBeanClass(Class<? extends RegistryTask> beanClass);
+
+        RegistryExecutorFactoryObject setQueue(RegistryBeanQueue<RegistryTask> queue);
+
+        RegistryExecutorFactoryObject setThreadCount(int nThreads);
+
+        RegistryExecutorFactoryObject setThreadGroupName(String name);
+
+        RegistryExecutorFactoryObject setDaemon(boolean value);
+
+        RegistryExecutorFactoryObject setThreadGroup(ThreadGroup group);
+    }
+
     public abstract StoreFactoryObject store();
 
     public abstract ClusterStateMonitorFactoryObject clusterStateMonitor();
@@ -85,20 +116,26 @@ public abstract class WebObjectsFactory {
 
     public abstract <T extends RegistryBean> RegistryBeanQueueFactoryObject<T> registryBeanQueue();
 
+    public abstract RegistryExecutorFactoryObject executor();
+
+    public Collection<? extends ColumnFamilyDefinition> getColumnDefinitions() {
+        return Collections.emptySet();
+    }
+
     private static final AtomicInteger INTEGER_NAME = new AtomicInteger();
 
-    public static InMemory inMemory() {
+    public static WebObjectsFactory inMemory() {
         return new InMemory();
     }
 
-    public static Cassandra cassandra(Keyspace keyspace) {
+    public static WebObjectsFactory cassandra(Keyspace keyspace) {
         return new Cassandra(keyspace);
     }
 
-    public static class InMemory extends WebObjectsFactory {
+    protected static class InMemory extends WebObjectsFactory {
         @Override
         public StoreFactoryObject store() {
-            return new InMemoryStoreFactoryObject(InMemory.this);
+            return new DefaultStoreFactoryObject(InMemory.this);
         }
 
         @Override
@@ -116,9 +153,14 @@ public abstract class WebObjectsFactory {
             return new DefaultRegistryBeanQueueFactoryObject<T>(InMemory.this);
         }
 
+        @Override
+        public RegistryExecutorFactoryObject executor() {
+            return new DefaultRegistryExecutorFactoryObject(this);
+        }
+
     }
 
-    public static class Cassandra extends InMemory {
+    protected static class Cassandra extends InMemory {
         private Keyspace keyspace;
 
         private List<ColumnFamilyDefinition> columnDefinitions = new ArrayList();
@@ -129,7 +171,7 @@ public abstract class WebObjectsFactory {
 
         @Override
         public StoreFactoryObject store() {
-            return new InMemoryStoreFactoryObject(this) {
+            return new DefaultStoreFactoryObject(this) {
                 @Override
                 public RegistryStore create() {
                     prepare();
@@ -160,13 +202,12 @@ public abstract class WebObjectsFactory {
 
     }
 
-
-    private static class InMemoryStoreFactoryObject implements StoreFactoryObject {
+    protected static class DefaultStoreFactoryObject implements StoreFactoryObject {
         protected final WebObjectsFactory factory;
         protected IdGenerator generator = IdGenerator.getGenerator(IdGenerator.Type.SEQUENTIAL);
         protected String name;
 
-        public InMemoryStoreFactoryObject(WebObjectsFactory factory) {
+        public DefaultStoreFactoryObject(WebObjectsFactory factory) {
             this.factory = factory;
         }
 
@@ -200,7 +241,7 @@ public abstract class WebObjectsFactory {
         }
     }
 
-    private static class DefaultClusterStateMonitorFactoryObject implements ClusterStateMonitorFactoryObject {
+    protected static class DefaultClusterStateMonitorFactoryObject implements ClusterStateMonitorFactoryObject {
         protected final WebObjectsFactory factory;
         protected RegistryStore store;
         protected long timeout;
@@ -269,7 +310,7 @@ public abstract class WebObjectsFactory {
         }
     }
 
-    private static class DefaultDistributedQueueFactoryObject<T> implements DistributedQueueFactoryObject<T> {
+    protected static class DefaultDistributedQueueFactoryObject<T> implements DistributedQueueFactoryObject<T> {
         protected final WebObjectsFactory factory;
         protected ClusterStateMonitor monitor;
         protected String monitorName;
@@ -305,7 +346,7 @@ public abstract class WebObjectsFactory {
             return new OrderTimeMapDistributedQueue<T>(store, monitor);
         }
 
-        private void prepare() {
+        protected void prepare() {
             if (storeName == null) {
                 storeName = Integer.toHexString(INTEGER_NAME.incrementAndGet()).toUpperCase();
             }
@@ -329,7 +370,7 @@ public abstract class WebObjectsFactory {
         }
     }
 
-    private static class DefaultRegistryBeanQueueFactoryObject<T extends RegistryBean> implements RegistryBeanQueueFactoryObject<T> {
+    protected static class DefaultRegistryBeanQueueFactoryObject<T extends RegistryBean> implements RegistryBeanQueueFactoryObject<T> {
         private final WebObjectsFactory factory;
         private String monitorName;
         private ClusterStateMonitor monitor;
@@ -383,7 +424,7 @@ public abstract class WebObjectsFactory {
             return new StoredRegistryBeanQueue<T>(store, idQueue, beanClass);
         }
 
-        private void prepare() {
+        protected void prepare() {
             if (storeName == null) {
                 storeName = Integer.toHexString(INTEGER_NAME.incrementAndGet()).toUpperCase();
             }
@@ -419,7 +460,147 @@ public abstract class WebObjectsFactory {
             if (beanClass == null) {
                 beanClass = (Class<? extends T>) RegistryBean.class; // for polymorphic behaviour
             }
+        }
+    }
 
+    private static class DefaultRegistryExecutorFactoryObject implements RegistryExecutorFactoryObject {
+        private final WebObjectsFactory factory;
+        private String monitorName;
+        private ClusterStateMonitor monitor;
+        private String storeName;
+        private RegistryStore store;
+        private String idQueueName;
+        private DistributedQueue<Long> idQueue;
+        private int nThreads;
+        private String threadGroupName;
+        private boolean daemon = true;
+        private ThreadGroup threadGroup;
+        private RegistryBeanQueue<RegistryTask> queue;
+        private Class<? extends RegistryTask> beanClass;
+
+        public DefaultRegistryExecutorFactoryObject(WebObjectsFactory factory) {
+            this.factory = factory;
+        }
+
+        public RegistryExecutorFactoryObject setMonitorStoreName(String name) {
+            monitorName = name;
+            return this;
+        }
+
+        public RegistryExecutorFactoryObject setMonitor(ClusterStateMonitor monitor) {
+            this.monitor = monitor;
+            return this;
+        }
+
+        public RegistryExecutorFactoryObject setStoreName(String storeName) {
+            this.storeName = storeName;
+            return this;
+        }
+
+        public RegistryExecutorFactoryObject setStore(RegistryStore store) {
+            this.store = store;
+            return this;
+        }
+
+        public RegistryExecutorFactoryObject setIdQueueName(String idQueueName) {
+            this.idQueueName = idQueueName;
+            return this;
+        }
+
+        public RegistryExecutorFactoryObject setIdQueue(DistributedQueue<Long> idQueue) {
+            this.idQueue = idQueue;
+            return this;
+        }
+
+        public RegistryExecutorFactoryObject setBeanClass(Class<? extends RegistryTask> beanClass) {
+            this.beanClass = beanClass;
+            return this;
+        }
+
+        public RegistryExecutorFactoryObject setQueue(RegistryBeanQueue<RegistryTask> queue) {
+            this.queue = queue;
+            return this;
+        }
+
+        public RegistryExecutorFactoryObject setThreadCount(int nThreads) {
+            this.nThreads = nThreads;
+            return this;
+        }
+
+        public RegistryExecutorFactoryObject setThreadGroupName(String name) {
+            threadGroupName = name;
+            return this;
+        }
+
+        public RegistryExecutorFactoryObject setDaemon(boolean value) {
+            daemon = value;
+            return this;
+        }
+
+        public RegistryExecutorFactoryObject setThreadGroup(ThreadGroup group) {
+            this.threadGroup = group;
+            return this;
+        }
+
+        protected void prepare() {
+            if (storeName == null) {
+                storeName = Integer.toHexString(INTEGER_NAME.incrementAndGet()).toUpperCase();
+            }
+
+            if (monitorName == null) {
+                monitorName = storeName + "$MONITOR";
+            }
+
+            if (idQueueName == null) {
+                idQueueName = storeName + "$IDQUEUE";
+            }
+
+            if (monitor == null) {
+                monitor = factory.clusterStateMonitor()
+                        .setStoreName(monitorName)
+                        .create();
+            }
+
+            if (queue == null) {
+                if (store == null) {
+                    store = factory.store()
+                            .setName(storeName)
+                            .setGeneratorType(IdGenerator.Type.NANO_TIME)
+                            .create();
+                }
+
+                if (idQueue == null) {
+                    idQueue = factory.<Long>distributedQueue()
+                            .setMonitor(monitor)
+                            .setStoreName(idQueueName)
+                            .create();
+                }
+
+                queue = factory.<RegistryTask>registryBeanQueue()
+                        .setStore(store)
+                        .setMonitor(monitor)
+                        .setBeanClass(beanClass)
+                        .create();
+            }
+
+            if (nThreads < 1) {
+                nThreads = 1;
+            }
+
+            if (threadGroupName == null) {
+                threadGroupName = storeName;
+            }
+
+            if (threadGroup == null) {
+                threadGroup = new ThreadGroup(threadGroupName);
+            }
+
+            threadGroup.setDaemon(daemon);
+        }
+
+        public RegistryExecutor create() {
+            prepare();
+            return new RegistryQueueExecutor(queue, threadGroup, nThreads);
         }
     }
 }

@@ -116,6 +116,9 @@ class SimpleRegistry implements Registry {
     }
 
     public void setExecutionContext(ExecutionContext context) {
+        if (context == null) {
+            throw new NullPointerException("context");
+        }
         executionContext = context;
     }
 

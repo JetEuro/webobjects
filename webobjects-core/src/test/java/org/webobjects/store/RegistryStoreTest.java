@@ -44,13 +44,13 @@ public class RegistryStoreTest extends Specification<RegistryStore> {
         RegistryStore store = RegistryStores.inMemory(IdGenerator.Type.SEQUENTIAL);
 
         public void addRequest() {
-            AddCommentRequest bean = Registries.newBean(AddCommentRequest.class);
+            User bean = Registries.newBean(User.class);
 
-            bean.getUser().setAge(25);
-            bean.getUser().setSex("M");
+            bean.setAge(25);
+            bean.setSex("M");
 
-            bean.getUser().getCredentials().setUsername("user");
-            bean.getUser().getCredentials().setPassword("password");
+            bean.getCredentials().setUsername("user");
+            bean.getCredentials().setPassword("password");
 
             long id = store
                     .newStorer(bean.getRegistry())

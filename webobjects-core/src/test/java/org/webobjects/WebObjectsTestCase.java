@@ -48,7 +48,7 @@ public abstract class WebObjectsTestCase {
 
         private Cluster cluster;
         private final boolean persistent;
-        private WebObjectsFactory.Cassandra factory;
+        private WebObjectsFactory factory;
         private List<ColumnFamilyDefinition> columnDefinitions = new ArrayList<ColumnFamilyDefinition>();
         private ClusterFactory clusterFactory;
 
@@ -113,7 +113,7 @@ public abstract class WebObjectsTestCase {
     }
 
     private static class InMemoryTestCase extends WebObjectsTestCase {
-        private WebObjectsFactory.InMemory inMemory = WebObjectsFactory.inMemory();
+        private WebObjectsFactory factory = WebObjectsFactory.inMemory();
 
         @Override
         public void init() {
@@ -121,7 +121,7 @@ public abstract class WebObjectsTestCase {
 
         @Override
         public WebObjectsFactory getFactory() {
-            return inMemory;
+            return factory;
         }
 
         @Override

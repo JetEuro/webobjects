@@ -32,4 +32,6 @@ public interface Registry extends SortedMap<String, Object> {
     <T extends RegistryBean> T bean(Class<T> clazz);
 
     ExecutionContext getExecutionContext();
+
+    void setExecutionContext(ExecutionContext context);
 }
