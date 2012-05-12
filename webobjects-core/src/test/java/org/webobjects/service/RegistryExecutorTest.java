@@ -42,6 +42,7 @@ public class RegistryExecutorTest extends Specification<RegistryExecutor> {
             awaitTillValueEquals(25, 5000);
             specify(value, 25);
 
+            executor.stop();
             testCase.cleanup();
         }
 
