@@ -107,7 +107,7 @@ class SimpleRegistry implements Registry {
             put(CLASS_PROPERTY, clazz.getName());
         }
         Class[]classArray = new Class[] { clazz, RegistryGettable.class, JavaDefaults.class };
-        return (T) Proxy.newProxyInstance(ClassLoader.getSystemClassLoader(),
+        return (T) Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(),
                 classArray, new BeanInvocationHandler(clazz));
     }
 

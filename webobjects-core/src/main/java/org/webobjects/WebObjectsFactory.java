@@ -204,7 +204,7 @@ public abstract class WebObjectsFactory {
 
     protected static class DefaultStoreFactoryObject implements StoreFactoryObject {
         protected final WebObjectsFactory factory;
-        protected IdGenerator generator = IdGenerator.getGenerator(IdGenerator.Type.SEQUENTIAL);
+        protected IdGenerator generator;
         protected String name;
 
         public DefaultStoreFactoryObject(WebObjectsFactory factory) {
@@ -236,7 +236,7 @@ public abstract class WebObjectsFactory {
                 name = Integer.toHexString(INTEGER_NAME.incrementAndGet()).toUpperCase();
             }
             if (generator == null) {
-                generator = IdGenerator.getGenerator(IdGenerator.Type.SEQUENTIAL);
+                generator = IdGenerator.getGenerator(IdGenerator.Type.SECURE_RANDOM);
             }
         }
     }
